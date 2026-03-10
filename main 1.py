@@ -1,115 +1,144 @@
-import asyncio
-import logging
-from aiogram import Bot, Dispatcher, types, F
-from aiogram.filters import Command
-from aiogram.utils.keyboard import InlineKeyboardBuilder
+import os
+import telebot
+from telebot import types
+from dotenv import load_dotenv
 
-# --- 1. SOZLAMALAR ---
-TOKEN = "8684510070:AAE8UShLG3AS2mME3ecbJA148lErJ4d9DMA"
-ADMIN_ID = 1419545474              # O'zingizning Telegram ID-ingizni yozing (@userinfobot beradi)
-OCHIQ_KANAL = "@film_box_uz"      # Majburiy obuna kanali
-YAPIQ_BAZA_ID = -1001439899296     # Kinolar turgan yopiq kanal ID-si
-INSTAGRAM_LINK = "https://www.instagram.com/filmbox.uz?igsh=ODUzd3JxMGJqaTZ0"
+# 1. SOZLAMALAR
+load_dotenv()
+TOKEN = os.getenv("8684510070:AAE8UShLG3AS2mME3ecbJA148lErJ4d9DMA")
+ADMIN_ID = 1419545474  # <--- O'ZINGIZNING ID RAQAMINGIZNI YOZING
+KANAL_ID = "@film_box_uz" # <--- TELEGRAM KANALINGIZ
+INSTA_LINK = "https://www.instagram.com/filmbox.uz?igsh=ODUzd3JxMGJqaTZ0" # <--- INSTAGRAM LINK
 
-# Foydalanuvchilar bazasi (Oddiy ro'yxat, bot o'chib yonsa tozalanadi)
-# Doimiy baza uchun SQLite ishlatsa bo'ladi, lekin hozircha shu ham yetadi
-USERS = set()
-
-logging.basicConfig(level=logging.INFO)
-bot = Bot(token=TOKEN)
-dp = Dispatcher()
+bot = telebot.TeleBot(TOKEN)
 
 # --- 2. KINO BAZASI ---
 # "kod": [message_id, "Nomi", "Hajmi", "Reyting"]
 KINOLAR = {
-    "1": [14, "The Convert", "686.8 Mb", "4.2"],
+    "1": [14, "Sirli qit'a", "686.8 Mb", "4.2"],
     "2": [15, "Avatar 2", "1.2 Gb", "4.8"],
-}
+users = set() # Foydalanuvchilar sonini hisoblash uchun
 
-# --- 3. YORDAMCHI FUNKSIYALAR ---
-async def check_sub(user_id):
+# --- FUNKSIYALAR ---
+
+def is_subscribed(user_id):
+    """Telegram kanalga obunani tekshirish"""
     try:
-        member = await bot.get_chat_member(chat_id=OCHIQ_KANAL, user_id=user_id)
-        return member.status in ["member", "administrator", "creator"]
-    except Exception as e:
-        print(f"Obuna xatosi: {e}")
-        return False
+        status = bot.get_chat_member(KANAL_ID, user_id).status
+        return status in ['creator', 'administrator', 'member']
+    except:
+        return True # Xato bo'lsa bot to'xtab qolmasligi uchun
 
-# --- 4. START BUYRUQ ---
-@dp.message(Command("start"))
-async def start_command(message: types.Message):
-    USERS.add(message.from_user.id) # Foydalanuvchini bazaga qo'shish
-    
-    if await check_sub(message.from_user.id):
-        await message.answer(
-            f"🌟 **Xush kelibsiz, {message.from_user.first_name}!**\n\n"
-            "Kino kodini yuboring va tomoshadan bahra oling!"
+def sub_markup():
+    """Majburiy obuna tugmalari"""
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    markup.add(
+        types.InlineKeyboardButton("1️⃣ Telegram Kanalimiz", url=f"https://t.me/{KANAL_ID.replace('@', '')}"),
+        types.InlineKeyboardButton("2️⃣ Instagram Profilimiz", url=INSTA_LINK),
+        types.InlineKeyboardButton("✅ Tekshirish", callback_data="check_sub")
+    )
+    return markup
+
+def main_menu():
+    """Asosiy menyu"""
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add("🔍 Kino qidirish", "📊 Statistika")
+    markup.add("👨‍💻 Admin bilan aloqa")
+    return markup
+
+# --- HANDLERLAR ---
+
+@bot.message_handler(commands=['start'])
+def start(message):
+    users.add(message.from_user.id)
+    if is_subscribed(message.from_user.id):
+        bot.send_message(
+            message.chat.id, 
+            f"Salom {message.from_user.first_name}! Kino kodini yuboring:", 
+            reply_markup=main_menu()
         )
     else:
-        builder = InlineKeyboardBuilder()
-        builder.row(types.InlineKeyboardButton(text="1️⃣ Telegram Kanal", url="https://t.me/film_box_uz"))
-        builder.row(types.InlineKeyboardButton(text="2️⃣ Instagram Sahifa", url=INSTAGRAM_LINK))
-        builder.row(types.InlineKeyboardButton(text="✅ Tasdiqlash", callback_data="check_all"))
-        
-        await message.answer(
-            "🛑 **To'xtang!** Botdan foydalanish uchun quyidagi sahifalarga obuna bo'lishingiz shart:",
-            reply_markup=builder.as_markup(),
+        bot.send_message(
+            message.chat.id, 
+            "🛑 **Botdan foydalanish uchun quyidagilarga obuna bo'lishingiz shart!**", 
+            reply_markup=sub_markup(),
             parse_mode="Markdown"
         )
 
-# --- 5. ADMIN PANEL (FAQAT SIZ UCHUN) ---
-@dp.message(Command("admin"), F.from_user.id == ADMIN_ID)
-async def admin_panel(message: types.Message):
-    builder = InlineKeyboardBuilder()
-    builder.row(types.InlineKeyboardButton(text="📊 Statistika", callback_data="stat"))
-    builder.row(types.InlineKeyboardButton(text="📢 Reklama yuborish", callback_data="send_ads"))
-    
-    await message.answer("🛠 **Admin Panelga xush kelibsiz!**", reply_markup=builder.as_markup())
+@bot.callback_query_handler(func=lambda call: call.data == "check_sub")
+def check_status(call):
+    if is_subscribed(call.from_user.id):
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        bot.send_message(call.message.chat.id, "✅ Tabriklaymiz! Endi kino kodini yuborishingiz mumkin.", reply_markup=main_menu())
+    else:
+        bot.answer_callback_query(call.id, "❌ Siz hali obuna bo'lmadingiz!", show_alert=True)
+        # Siz aytgandek, yana qaytadan yo'naltirish:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        bot.send_message(
+            call.message.chat.id, 
+            "⚠️ **Shartlar bajarilmadi!**\nIltimos, obuna bo'lib so'ng 'Tekshirish'ni bosing.", 
+            reply_markup=sub_markup(),
+            parse_mode="Markdown"
+        )
 
-# --- 6. KINO YUBORISH MANTIQI ---
-@dp.message(F.text)
-async def handle_message(message: types.Message):
-    user_id = message.from_user.id
-    kod = message.text.strip()
+# --- KINO QIDIRISH ---
 
-    if not await check_sub(user_id):
-        return await start_command(message)
+@bot.message_handler(func=lambda message: not message.text.startswith('/'))
+def handle_text(message):
+    # Har safar obunani tekshirish
+    if not is_subscribed(message.from_user.id):
+        return start(message)
 
-    if kod in KINOLAR:
-        msg_id, nomi, hajmi, reyting = KINOLAR[kod]
+    code = message.text
+    if code in movies:
+        m = movies[code]
+        btn = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton("📽 Ko'rish", url=m['link']))
+        bot.send_message(message.chat.id, f"🎬 **Kino:** {m['nom']}\n🆔 **Kod:** {code}", reply_markup=btn, parse_mode="Markdown")
+    elif code == "🔍 Kino qidirish":
+        bot.send_message(message.chat.id, "Kino kodini kiriting:")
+    elif code == "📊 Statistika":
+        bot.send_message(message.chat.id, f"📊 Bazada: {len(movies)} ta kino bor.\n👥 Foydalanuvchilar: {len(users)} ta")
+    else:
+        bot.send_message(message.chat.id, "❌ Bunday kodli kino topilmadi.")
+
+# --- ADMIN PANEL ---
+
+@bot.message_handler(commands=['admin'])
+def admin_panel(message):
+    if message.from_user.id == ADMIN_ID:
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        markup.add("➕ Kino qo'shish", "📢 Reklama yuborish", "🏠 Chiqish")
+        bot.send_message(message.chat.id, "Admin paneliga xush kelibsiz!", reply_markup=markup)
+
+@bot.message_handler(func=lambda message: message.text == "➕ Kino qo'shish")
+def add_movie_start(message):
+    if message.from_user.id == ADMIN_ID:
+        msg = bot.send_message(message.chat.id, "Format: `kod|nomi|link` \n(Masalan: `105|Forsaj|https://..`)")
+        bot.register_next_step_handler(msg, add_movie_save)
+
+def add_movie_save(message):
+    try:
+        c, n, l = message.text.split('|')
+        movies[c] = {"nom": n, "link": l}
+        bot.send_message(message.chat.id, f"✅ Qo'shildi: {n}")
+    except:
+        bot.send_message(message.chat.id, "❌ Xato! Qayta urinib ko'ring.")
+
+@bot.message_handler(func=lambda message: message.text == "📢 Reklama yuborish")
+def send_ad_start(message):
+    if message.from_user.id == ADMIN_ID:
+        msg = bot.send_message(message.chat.id, "Reklama xabarini yuboring (matn):")
+        bot.register_next_step_handler(msg, send_ad_all)
+
+def send_ad_all(message):
+    count = 0
+    for user in users:
         try:
-            await bot.copy_message(
-                chat_id=message.chat.id,
-                from_chat_id=YAPIQ_BAZA_ID,
-                message_id=msg_id,
-                caption=f"🎬 **Nomi:** {nomi}\n📂 **Hajmi:** {hajmi}\n🌟 **Reyting:** {reyting}\n\n🎥 @film_box_uz",
-                parse_mode="Markdown"
-            )
-        except Exception as e:
-            await message.answer(f"⚠️ Xatolik: {e}")
-            await bot.send_message(ADMIN_ID, f"❌ Xato! Kod: {kod}, Sabab: {e}")
-    elif not kod.startswith('/'):
-        await message.answer("😔 Bunday kodli kino topilmadi. Iltimos, kodni to'g'ri yozganingizni tekshiring.")
-
-# --- 7. CALLBACKLAR (TUGMALAR) ---
-@dp.callback_query()
-async def callbacks(callback: types.CallbackQuery):
-    if callback.data == "check_all":
-        if await check_sub(callback.from_user.id):
-            await callback.message.edit_text("✅ Rahmat! Endi kino kodini yubora olasiz.")
-        else:
-            await callback.answer("❌ Obuna bo'lmadingiz!", show_alert=True)
-            
-    elif callback.data == "stat" and callback.from_user.id == ADMIN_ID:
-        await callback.message.answer(f"👥 Bot foydalanuvchilari soni: {len(USERS)} ta")
-        
-    elif callback.data == "send_ads" and callback.from_user.id == ADMIN_ID:
-        await callback.message.answer("Reklama yuborish uchun hozircha kodni biroz mukammallashtirish kerak. (Reply orqali yuborish funksiyasi)")
-
-# --- 8. ISHGA TUSHIRISH ---
-async def main():
-    print("🚀 Premium Bot ishga tushdi...")
-    await dp.start_polling(bot)
+            bot.send_message(user, message.text)
+            count += 1
+        except:
+            pass
+    bot.send_message(ADMIN_ID, f"✅ Reklama {count} ta odamga yetib bordi.")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    bot.infinity_polling()
