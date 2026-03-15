@@ -1,144 +1,98 @@
-import os
-import telebot
-from telebot import types
-from dotenv import load_dotenv
+import asyncio
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import Command
+from aiohttp import web
 
-# 1. SOZLAMALAR
-load_dotenv()
-TOKEN = os.getenv("8684510070:AAE8UShLG3AS2mME3ecbJA148lErJ4d9DMA")
-ADMIN_ID = 1419545474  # <--- O'ZINGIZNING ID RAQAMINGIZNI YOZING
-KANAL_ID = "@film_box_uz" # <--- TELEGRAM KANALINGIZ
-INSTA_LINK = "https://www.instagram.com/filmbox.uz?igsh=ODUzd3JxMGJqaTZ0" # <--- INSTAGRAM LINK
+# --- 1. SOZLAMALAR ---
+API_TOKEN = '8684510070:AAEwhbTztOKG1OgmQGIHBWafVQnVImGdfhU' 
+BAZA_KANAL_ID = -1001439899296 
 
-bot = telebot.TeleBot(TOKEN)
-
-# --- 2. KINO BAZASI ---
-# "kod": [message_id, "Nomi", "Hajmi", "Reyting"]
+# --- 2. KINOLAR BAZASI ---
 KINOLAR = {
-    "1": [14, "Sirli qit'a", "686.8 Mb", "4.2"],
-    "2": [15, "Avatar 2", "1.2 Gb", "4.8"],
-users = set() # Foydalanuvchilar sonini hisoblash uchun
+    "1": {"nomi": "Sirli qit'a", "sifat": "HD", "davlat": "Noma'lum", "janr": "#Sarguzasht", "yil": "Noma'lum", "msg_id": 14, "file_id": ""},
+    "2": {"nomi": "Begona odam va tuman 1976", "sifat": "720p HD", "davlat": "Eron", "janr": "#Drama #Detektiv", "yil": "1976", "msg_id": 21, "file_id": ""},
+    "3": {"nomi": "Arvohlar Kemas", "sifat": "720p HD", "davlat": "Buyuk Britaniya", "janr": "#Ujas #Drama", "yil": "2023", "msg_id": 25, "file_id": ""},
+    "4": {"nomi": "Jazolovchi", "sifat": "720p HD", "davlat": "AQSH, Germaniya", "janr": "#Jangari #Triller #Drama #Kriminal", "yil": "2004", "msg_id": 27, "file_id": ""},
+    "5": {"nomi": "Kolumbiana", "sifat": "720p HD", "davlat": "Fransiya, Meksika", "janr": "#Jangari #Triller #Drama", "yil": "2011", "msg_id": 29, "file_id": ""},
+    "6": {"nomi": "Revolver", "sifat": "720p HD", "davlat": "Buyuk Britaniya, Fransiya", "janr": "#Jangari #Triller #Drama #Kriminal #Detektiv", "yil": "2005", "msg_id": 31, "file_id": ""},
+    "7": {"nomi": "Tuyg'u", "sifat": "720p HD", "davlat": "Italiya", "janr": "#Urush #Drama #Melodrama", "yil": "1954", "msg_id": 33, "file_id": ""},
+    "8": {"nomi": "G'alati Tomas Odd", "sifat": "720p HD", "davlat": "AQSH, Buyuk Britaniya", "janr": "#Ujas #Triller #Komediya", "yil": "2013", "msg_id": 35, "file_id": ""},
+    "9": {"nomi": "13 ta o'q", "sifat": "720p HD", "davlat": "AQSH", "janr": "#Triller #Drama #Kriminal", "yil": "2009", "msg_id": 37, "file_id": ""},
+    "10": {"nomi": "Fortuna operatsiyasi", "sifat": "720p HD", "davlat": "AQSH, Xitoy", "janr": " #Jangari #Triller", "yil": "2022", "msg_id": 40, "file_id": ""},
+    "11": {"nomi": "Liger", "yil": "2022", "davlat": "Hindiston", "janr": "#Jangari #Drama #Sport", "sifat": "720p HD", "msg_id": 42, "file_id": ""},
+    "12": {"nomi": "Odamxo'rlar", "yil": "2021", "davlat": "Fransiya", "janr": "#Ujas #Komediya", "sifat": "720p HD", "msg_id": 44, "file_id": ""},
+    "13": {"nomi": "Jonim seni yohud egizaklar", "yil": "2004", "davlat": "O'zbekiston", "janr": "#Melodrama #Komediya", "sifat": "720p HD", "msg_id": 46, "file_id": ""},
+    "14": {"nomi": "Osvensim Chempioni", "yil": "2020", "davlat": "Polsha", "janr": "#Biografiya #Urush #Tarixiy", "sifat": "720p HD", "msg_id": 48, "file_id": ""},
+    "15": {"nomi": "Jangari futbol", "yil": "2001", "davlat": "GongKong, Xitoy", "janr": "#Jangari #Komediya", "sifat": "720p HD", "msg_id": 50, "file_id": ""},
+    "16": {"nomi": "Tinchlikparvar", "yil": "1997", "davlat": "AQSH", "janr": "#Jangari #Triller", "sifat": "720p HD", "msg_id": 52, "file_id": ""},
+    "17": {"nomi": "Firibgar", "yil": "1993", "davlat": "Hindiston", "janr": "#Triller #Kriminal", "sifat": "720p HD", "msg_id": 54, "file_id": ""},
+    "18": {"nomi": "Qo'ng'iroq", "yil": "2002", "davlat": "AQSH, Yaponiya", "janr": "#Ujas", "sifat": "720p HD", "msg_id": 56, "file_id": ""},
+    "19": {"nomi": "Kelajakka qaytib 1", "yil": "1985", "davlat": "AQSH", "janr": "#Fantastika #Sarguzasht", "sifat": "720p HD", "msg_id": 58, "file_id": ""},
+    "20": {"nomi": "Kelajakka qaytib 2", "yil": "1989", "davlat": "AQSH", "janr": "#Fantastika #Oilaviy", "sifat": "720p HD", "msg_id": 61, "file_id": ""},
+    "21": {"nomi": "Kelajakka qaytib 3", "yil": "1990", "davlat": "AQSH", "janr": "#Vestern #Fantastika", "sifat": "720p HD", "msg_id": 62, "file_id": ""},
+    "22": {"nomi": "Arvoh qizning hikoyasi", "yil": "2014", "davlat": "Janubiy Koreya", "janr": "#Ujas #Triller", "sifat": "720p HD", "msg_id": 64, "file_id": ""},
+    "23": {"nomi": "Astronavt Farmer", "yil": "2006", "davlat": "AQSH", "janr": "#Drama #Fantastika", "sifat": "720p HD", "msg_id": 67, "file_id": ""},
+    "24": {"nomi": "Manfur kimsalar", "yil": "2009", "davlat": "Germaniya, AQSH", "janr": "#Harbiy #Drama", "sifat": "720p HD", "msg_id": 68, "file_id": ""},
+    "25": {"nomi": "O'lja ishtiyoqi", "yil": "2024", "davlat": "Fransiya, Belgiya", "janr": "#Triller #Komediya", "sifat": "720p HD", "msg_id": 69, "file_id": ""},
+    "26": {"nomi": "Uidji Veronika lanati", "yil": "2017", "davlat": "Ispaniya", "janr": "#Ujas", "sifat": "720p HD", "msg_id": 70, "file_id": ""},
+    "27": {"nomi": "Dahshatli masxaraboz 1", "yil": "2016", "davlat": "AQSH", "janr": "#Ujas", "sifat": "720p HD", "msg_id": 71, "file_id": ""},
+    "28": {"nomi": "Dahshatli masxaraboz 2", "yil": "2022", "davlat": "AQSH", "janr": "#Ujas", "sifat": "720p HD", "msg_id": 72, "file_id": ""},
+    "29": {"nomi": "La'natlangan uy", "yil": "2018", "davlat": "AQSH", "janr": "#Ujas #Drama", "sifat": "720p HD", "msg_id": 73, "file_id": ""},
+    "30": {"nomi": "Qoyalarning ko'zlari bor 1", "yil": "2006", "davlat": "AQSH", "janr": "#Ujas #Triller", "sifat": "720p HD", "msg_id": 74, "file_id": ""},
+    "31": {"nomi": "Qoyalarning ko'zlari bor 2", "yil": "2007", "davlat": "AQSH", "janr": "#Ujas #Triller", "sifat": "720p HD", "msg_id": 75, "file_id": ""}
+}
 
-# --- FUNKSIYALAR ---
+bot = Bot(token=API_TOKEN.strip())
+dp = Dispatcher()
 
-def is_subscribed(user_id):
-    """Telegram kanalga obunani tekshirish"""
-    try:
-        status = bot.get_chat_member(KANAL_ID, user_id).status
-        return status in ['creator', 'administrator', 'member']
-    except:
-        return True # Xato bo'lsa bot to'xtab qolmasligi uchun
+# Render veb-serveri
+async def handle(request):
+    return web.Response(text="Bot is running!")
 
-def sub_markup():
-    """Majburiy obuna tugmalari"""
-    markup = types.InlineKeyboardMarkup(row_width=1)
-    markup.add(
-        types.InlineKeyboardButton("1️⃣ Telegram Kanalimiz", url=f"https://t.me/{KANAL_ID.replace('@', '')}"),
-        types.InlineKeyboardButton("2️⃣ Instagram Profilimiz", url=INSTA_LINK),
-        types.InlineKeyboardButton("✅ Tekshirish", callback_data="check_sub")
-    )
-    return markup
+async def start_web_server():
+    app = web.Application()
+    app.router.add_get("/", handle)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', 8080)
+    await site.start()
 
-def main_menu():
-    """Asosiy menyu"""
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add("🔍 Kino qidirish", "📊 Statistika")
-    markup.add("👨‍💻 Admin bilan aloqa")
-    return markup
+@dp.message(Command("start"))
+async def cmd_start(message: types.Message):
+    await message.answer("👋 Salom, Hazrati oliylari!\nKino kodini yuboring.")
 
-# --- HANDLERLAR ---
+@dp.message()
+async def handle_message(message: types.Message):
+    if message.video:
+        file_id = message.video.file_id
+        return await message.answer(f"🎞 File ID:\n`{file_id}`", parse_mode="Markdown")
 
-@bot.message_handler(commands=['start'])
-def start(message):
-    users.add(message.from_user.id)
-    if is_subscribed(message.from_user.id):
-        bot.send_message(
-            message.chat.id, 
-            f"Salom {message.from_user.first_name}! Kino kodini yuboring:", 
-            reply_markup=main_menu()
+    kod = message.text.strip()
+    
+    if kod in KINOLAR:
+        k = KINOLAR[kod]
+        txt = (
+            f"🎬 Nomi: {k['nomi']}\n"
+            f"💽 Sifati: {k.get('sifat', '720p HD')}\n"
+            f"🌎 Davlati: {k.get('davlat', 'Noma\'lum')}\n"
+            f"🎭 Janri: {k.get('janr', 'Noma\'lum')}\n"
+            f"🇺🇿 Tili: O'zbek tilida\n"
+            f"📅 Yili: {k.get('yil', 'Noma\'lum')} yil\n\n"
+            f"🍿 @filmboxuzkanal" 
         )
-    else:
-        bot.send_message(
-            message.chat.id, 
-            "🛑 **Botdan foydalanish uchun quyidagilarga obuna bo'lishingiz shart!**", 
-            reply_markup=sub_markup(),
-            parse_mode="Markdown"
-        )
 
-@bot.callback_query_handler(func=lambda call: call.data == "check_sub")
-def check_status(call):
-    if is_subscribed(call.from_user.id):
-        bot.delete_message(call.message.chat.id, call.message.message_id)
-        bot.send_message(call.message.chat.id, "✅ Tabriklaymiz! Endi kino kodini yuborishingiz mumkin.", reply_markup=main_menu())
-    else:
-        bot.answer_callback_query(call.id, "❌ Siz hali obuna bo'lmadingiz!", show_alert=True)
-        # Siz aytgandek, yana qaytadan yo'naltirish:
-        bot.delete_message(call.message.chat.id, call.message.message_id)
-        bot.send_message(
-            call.message.chat.id, 
-            "⚠️ **Shartlar bajarilmadi!**\nIltimos, obuna bo'lib so'ng 'Tekshirish'ni bosing.", 
-            reply_markup=sub_markup(),
-            parse_mode="Markdown"
-        )
-
-# --- KINO QIDIRISH ---
-
-@bot.message_handler(func=lambda message: not message.text.startswith('/'))
-def handle_text(message):
-    # Har safar obunani tekshirish
-    if not is_subscribed(message.from_user.id):
-        return start(message)
-
-    code = message.text
-    if code in movies:
-        m = movies[code]
-        btn = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton("📽 Ko'rish", url=m['link']))
-        bot.send_message(message.chat.id, f"🎬 **Kino:** {m['nom']}\n🆔 **Kod:** {code}", reply_markup=btn, parse_mode="Markdown")
-    elif code == "🔍 Kino qidirish":
-        bot.send_message(message.chat.id, "Kino kodini kiriting:")
-    elif code == "📊 Statistika":
-        bot.send_message(message.chat.id, f"📊 Bazada: {len(movies)} ta kino bor.\n👥 Foydalanuvchilar: {len(users)} ta")
-    else:
-        bot.send_message(message.chat.id, "❌ Bunday kodli kino topilmadi.")
-
-# --- ADMIN PANEL ---
-
-@bot.message_handler(commands=['admin'])
-def admin_panel(message):
-    if message.from_user.id == ADMIN_ID:
-        markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        markup.add("➕ Kino qo'shish", "📢 Reklama yuborish", "🏠 Chiqish")
-        bot.send_message(message.chat.id, "Admin paneliga xush kelibsiz!", reply_markup=markup)
-
-@bot.message_handler(func=lambda message: message.text == "➕ Kino qo'shish")
-def add_movie_start(message):
-    if message.from_user.id == ADMIN_ID:
-        msg = bot.send_message(message.chat.id, "Format: `kod|nomi|link` \n(Masalan: `105|Forsaj|https://..`)")
-        bot.register_next_step_handler(msg, add_movie_save)
-
-def add_movie_save(message):
-    try:
-        c, n, l = message.text.split('|')
-        movies[c] = {"nom": n, "link": l}
-        bot.send_message(message.chat.id, f"✅ Qo'shildi: {n}")
-    except:
-        bot.send_message(message.chat.id, "❌ Xato! Qayta urinib ko'ring.")
-
-@bot.message_handler(func=lambda message: message.text == "📢 Reklama yuborish")
-def send_ad_start(message):
-    if message.from_user.id == ADMIN_ID:
-        msg = bot.send_message(message.chat.id, "Reklama xabarini yuboring (matn):")
-        bot.register_next_step_handler(msg, send_ad_all)
-
-def send_ad_all(message):
-    count = 0
-    for user in users:
         try:
-            bot.send_message(user, message.text)
-            count += 1
-        except:
-            pass
-    bot.send_message(ADMIN_ID, f"✅ Reklama {count} ta odamga yetib bordi.")
+            await bot.copy_message(chat_id=message.chat.id, from_chat_id=BAZA_KANAL_ID, message_id=k['msg_id'], caption=txt, parse_mode="Markdown")
+        except Exception as e:
+            await message.answer(f"❌ Xato: {e}")
+    elif not kod.startswith('/'):
+        await message.answer("😔 Kino topilmadi.")
+
+async def main():
+    asyncio.create_task(start_web_server())
+    await bot.delete_webhook(drop_pending_updates=True)
+    print("--- 🚀 BOT ISHLAYABDI ---")
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    bot.infinity_polling()
+    asyncio.run(main())
