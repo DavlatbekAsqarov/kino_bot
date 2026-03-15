@@ -11,7 +11,7 @@ BAZA_KANAL_ID = -1001439899296
 KINOLAR = {
     "1": {"nomi": "Sirli qit'a", "sifat": "HD", "davlat": "Noma'lum", "janr": "#Sarguzasht", "yil": "Noma'lum", "msg_id": 14, "file_id": ""},
     "2": {"nomi": "Begona odam va tuman 1976", "sifat": "720p HD", "davlat": "Eron", "janr": "#Drama #Detektiv", "yil": "1976", "msg_id": 21, "file_id": ""},
-    "3": {"nomi": "Arvohlar Kemas", "sifat": "720p HD", "davlat": "Buyuk Britaniya", "janr": "#Ujas #Drama", "yil": "2023", "msg_id": 25, "file_id": ""},
+    "3": {"nomi": "Arvohlar Kemasi", "sifat": "720p HD", "davlat": "Buyuk Britaniya", "janr": "#Ujas #Drama", "yil": "2023", "msg_id": 25, "file_id": ""},
     "4": {"nomi": "Jazolovchi", "sifat": "720p HD", "davlat": "AQSH, Germaniya", "janr": "#Jangari #Triller #Drama #Kriminal", "yil": "2004", "msg_id": 27, "file_id": ""},
     "5": {"nomi": "Kolumbiana", "sifat": "720p HD", "davlat": "Fransiya, Meksika", "janr": "#Jangari #Triller #Drama", "yil": "2011", "msg_id": 29, "file_id": ""},
     "6": {"nomi": "Revolver", "sifat": "720p HD", "davlat": "Buyuk Britaniya, Fransiya", "janr": "#Jangari #Triller #Drama #Kriminal #Detektiv", "yil": "2005", "msg_id": 31, "file_id": ""},
